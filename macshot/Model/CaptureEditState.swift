@@ -18,6 +18,11 @@ struct CaptureEditState: Codable, Equatable {
     var beautifyIsWindowSnap: Bool = false
     var customBeautifyBackgroundPNG: Data?
 
+    /// Drop shadow on a transparent canvas. Ignored while beautify is on,
+    /// because beautify already paints its own shadow onto a background.
+    var screenshotShadowEnabled: Bool = false
+    var screenshotShadowRadius: Double = 20
+
     var effectsPreset: ImageEffectPreset {
         ImageEffectPreset(rawValue: effectsPresetRaw) ?? .none
     }
@@ -33,7 +38,11 @@ struct CaptureEditState: Codable, Equatable {
     }
 
     var hasEffects: Bool { !effectsConfig.isIdentity }
-    var hasPostProcessing: Bool { hasEffects || beautifyEnabled }
+    /// Transparent-canvas shadow. Beautify's own shadow stays on its background.
+    var hasTransparentShadow: Bool {
+        screenshotShadowEnabled && !beautifyEnabled && screenshotShadowRadius > 0
+    }
+    var hasPostProcessing: Bool { hasEffects || beautifyEnabled || hasTransparentShadow }
 
     var beautifyMode: BeautifyMode {
         BeautifyMode(rawValue: beautifyModeRaw) ?? .window
@@ -86,6 +95,8 @@ extension CaptureEditState {
         beautifyBackgroundBlur = c.decode(.beautifyBackgroundBlur, or: 0)
         beautifyIsWindowSnap = c.decode(.beautifyIsWindowSnap, or: false)
         customBeautifyBackgroundPNG = c.decodeOptional(.customBeautifyBackgroundPNG)
+        screenshotShadowEnabled = c.decode(.screenshotShadowEnabled, or: false)
+        screenshotShadowRadius = c.decode(.screenshotShadowRadius, or: 20)
         normalizeValues()
     }
 
@@ -101,6 +112,7 @@ extension CaptureEditState {
         beautifyCornerRadius = SavedCaptureValidation.bounded(beautifyCornerRadius, 0...1024, fallback: 10)
         beautifyShadowRadius = SavedCaptureValidation.bounded(beautifyShadowRadius, 0...100, fallback: 20)
         beautifyBackgroundBlur = SavedCaptureValidation.bounded(beautifyBackgroundBlur, 0...50, fallback: 0)
+        screenshotShadowRadius = SavedCaptureValidation.bounded(screenshotShadowRadius, 0...100, fallback: 20)
     }
 }
 
@@ -127,7 +139,9 @@ extension OverlayView {
             beautifyShadowRadius: Double(beautifyShadowRadius),
             beautifyBackgroundBlur: Double(beautifyBackgroundBlur),
             beautifyIsWindowSnap: selectionIsWindowSnap,
-            customBeautifyBackgroundPNG: customBackgroundData
+            customBeautifyBackgroundPNG: customBackgroundData,
+            screenshotShadowEnabled: screenshotShadowEnabled,
+            screenshotShadowRadius: Double(screenshotShadowRadius)
         )
     }
 
@@ -150,6 +164,8 @@ extension OverlayView {
         beautifyBackgroundBlur = CGFloat(state.beautifyBackgroundBlur)
         selectionIsWindowSnap = state.beautifyIsWindowSnap
         customBeautifyBackground = state.customBeautifyBackground
+        screenshotShadowEnabled = state.screenshotShadowEnabled
+        screenshotShadowRadius = CGFloat(state.screenshotShadowRadius)
         if customBeautifyBackground != nil {
             prepareBeautifyBackgroundCache()
         } else {

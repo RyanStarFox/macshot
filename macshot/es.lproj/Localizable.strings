@@ -161,6 +161,7 @@
 "Smart" = "Inteligente";
 "Padding" = "Relleno";
 "Shadow" = "Sombra";
+"Drop Shadow" = "Sombra paralela";
 "Right-click to add points" = "Clic derecho para agregar puntos";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "Mantén 1 auto-vertical  ·  Mantén 2 auto-horizontal";
 "Limit to selection" = "Limitar a la selección";

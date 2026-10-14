@@ -165,6 +165,7 @@
 "Smart" = "Smart";
 "Padding" = "Utfyllnad";
 "Shadow" = "Skugga";
+"Drop Shadow" = "Skugga";
 "Right-click to add points" = "H\U00F6gerklicka f\U00F6r att l\U00E4gga till punkter";
 "Hold 1 auto-vertical  \U00B7  Hold 2 auto-horizontal" = "H\U00E5ll 1 auto-vertikalt  \U00B7  H\U00E5ll 2 auto-horisontellt";
 "Limit to selection" = "Begränsa till markering";

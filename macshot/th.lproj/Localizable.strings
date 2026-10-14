@@ -160,6 +160,7 @@
 "Smart" = "อัจฉริยะ";
 "Padding" = "ระยะห่าง";
 "Shadow" = "เงา";
+"Drop Shadow" = "เงา";
 "Right-click to add points" = "คลิกขวาเพื่อเพิ่มจุด";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "กด 1 แนวตั้งอัตโนมัติ  ·  กด 2 แนวนอนอัตโนมัติ";
 "Limit to selection" = "จำกัดในส่วนที่เลือก";

@@ -147,6 +147,7 @@
 "Smart" = "Intelligente";
 "Padding" = "Margine";
 "Shadow" = "Ombra";
+"Drop Shadow" = "Ombra esterna";
 "Right-click to add points" = "Click destro per multicurva";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "Tieni 1 auto-verticale  ·  Tieni 2 auto-orizzontale";
 "Limit to selection" = "Limita alla selezione";

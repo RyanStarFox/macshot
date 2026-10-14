@@ -110,6 +110,15 @@ class ToolOptionsRowView: NSView {
         currentTool = tool
         var curX: CGFloat = padding
 
+        // ── Transparent drop-shadow options ──
+        if ov.showShadowInOptionsRow {
+            curX = addScreenshotShadowOptions(at: curX, ov: ov)
+            let totalW = max(curX + padding, 200)
+            contentWidth = totalW
+            frame.size = NSSize(width: totalW, height: rowHeight)
+            return
+        }
+
         // ── Beautify options (overrides tool options when active) ──
         if ov.showBeautifyInOptionsRow {
             curX = addBeautifyOptions(at: curX, ov: ov)
@@ -1276,6 +1285,50 @@ class ToolOptionsRowView: NSView {
                                font: btnFont, height: btnH, y: btnY)
 
         return curX
+    }
+
+    private func addScreenshotShadowOptions(at x: CGFloat, ov: OverlayView) -> CGFloat {
+        var curX = x
+        let toggleBtn = NSButton(
+            checkboxWithTitle: L("Drop Shadow"), target: self,
+            action: #selector(screenshotShadowToggleChanged(_:)))
+        toggleBtn.state = ov.screenshotShadowEnabled ? .on : .off
+        toggleBtn.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        if let cell = toggleBtn.cell as? NSButtonCell {
+            cell.attributedTitle = NSAttributedString(string: L("Drop Shadow"), attributes: [
+                .foregroundColor: ToolbarLayout.iconColor.withAlphaComponent(0.85),
+                .font: NSFont.systemFont(ofSize: 10, weight: .medium)
+            ])
+        }
+        toggleBtn.sizeToFit()
+        toggleBtn.frame.origin = NSPoint(x: curX, y: (rowHeight - toggleBtn.frame.height) / 2)
+        addSubview(toggleBtn)
+        curX += toggleBtn.frame.width + 4
+
+        curX = addSeparator(at: curX)
+
+        // Beautify paints on its own background, so this radius does nothing then.
+        let sliderEnabled = ov.screenshotShadowEnabled && !ov.beautifyEnabled
+        curX = addBeautifySlider(
+            at: curX, label: L("Shadow"), value: ov.screenshotShadowRadius,
+            min: 0, max: 100, isEnabled: sliderEnabled,
+            action: #selector(screenshotShadowRadiusChanged(_:)))
+        return curX
+    }
+
+    @objc private func screenshotShadowToggleChanged(_ sender: NSButton) {
+        guard let ov = overlayView else { return }
+        ov.setScreenshotShadowEnabled(sender.state == .on)
+        ov.rebuildToolbarLayout()
+    }
+
+    @objc private func screenshotShadowRadiusChanged(_ sender: NSSlider) {
+        guard let ov = overlayView else { return }
+        ov.screenshotShadowRadius = CGFloat(sender.floatValue)
+        UserDefaults.standard.set(sender.doubleValue, forKey: "screenshotShadowRadius")
+        ov.cachedCompositedImage = nil
+        ov.needsDisplay = true
+        ov.onContentChanged?()
     }
 
     private func addBeautifyOptions(at x: CGFloat, ov: OverlayView) -> CGFloat {

@@ -517,6 +517,92 @@ class BeautifyRenderer {
         return min(4 + radius * 0.18, 16)
     }
 
+    /// How far a transparent-background shadow extends past the image, in points.
+    /// The canvas grows by this on every side so the blur is not cut off.
+    static func shadowBleed(for radius: CGFloat) -> CGFloat {
+        guard radius > 0 else { return 0 }
+        return radius + shadowOffset(for: radius)
+    }
+
+    /// Cast the ambient and contact shadows from whatever `draw` paints, then
+    /// paint that content once more with no shadow. `draw` may run three times.
+    static func drawCasterShadow(radius: CGFloat, context: CGContext, draw: () -> Void) {
+        if radius > 0 {
+            context.saveGState()
+            context.setShadow(
+                offset: CGSize(width: 0, height: -shadowOffset(for: radius)),
+                blur: radius,
+                color: NSColor.black.withAlphaComponent(shadowAlpha(for: radius)).cgColor)
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            draw()
+            context.endTransparencyLayer()
+            context.restoreGState()
+
+            context.saveGState()
+            context.setShadow(
+                offset: CGSize(width: 0, height: -contactShadowOffset(for: radius)),
+                blur: contactShadowBlur(for: radius),
+                color: NSColor.black.withAlphaComponent(contactShadowAlpha(for: radius)).cgColor)
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+            draw()
+            context.endTransparencyLayer()
+            context.restoreGState()
+        }
+        draw()
+    }
+
+    /// Place `image` on a transparent canvas with a drop shadow.
+    /// A corner radius of 0 keeps a rectangular selection sharp. Pixels that are
+    /// already transparent (a snapped window) still shape the shadow — nothing
+    /// opaque is filled in behind them. Radius 0 returns `image` unchanged.
+    static func renderTransparentShadow(image: NSImage, shadowRadius: CGFloat, cornerRadius: CGFloat = 0) -> NSImage {
+        guard shadowRadius > 0,
+              image.size.width > 0, image.size.height > 0,
+              let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              source.width > 0, source.height > 0 else { return image }
+
+        let scale = CGFloat(source.width) / image.size.width
+        guard scale.isFinite, scale > 0 else { return image }
+        let bleed = shadowBleed(for: shadowRadius)
+        let bleedPx = Int((bleed * scale).rounded())
+        let pixelW = source.width + bleedPx * 2
+        let pixelH = source.height + bleedPx * 2
+        guard pixelW > 0, pixelH > 0 else { return image }
+
+        let pointBleed = CGFloat(bleedPx) / scale
+        let pointSize = NSSize(width: image.size.width + pointBleed * 2,
+                                height: image.size.height + pointBleed * 2)
+        let colorSpace = (source.colorSpace?.model == .rgb ? source.colorSpace : nil)
+            ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        guard let context = CGContext(
+            data: nil, width: pixelW, height: pixelH,
+            bitsPerComponent: 8, bytesPerRow: pixelW * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+
+        context.clear(CGRect(x: 0, y: 0, width: pixelW, height: pixelH))
+        context.interpolationQuality = .high
+        context.scaleBy(x: scale, y: scale)
+
+        let content = CGRect(x: pointBleed, y: pointBleed, width: image.size.width, height: image.size.height)
+        let radius = min(max(cornerRadius, 0), min(content.width, content.height) / 2)
+        drawCasterShadow(radius: shadowRadius, context: context) {
+            context.saveGState()
+            if radius > 0 {
+                context.addPath(CGPath(roundedRect: content, cornerWidth: radius, cornerHeight: radius, transform: nil))
+                context.clip()
+            }
+            context.draw(source, in: content)
+            context.restoreGState()
+        }
+
+        guard let rendered = context.makeImage() else { return image }
+        let result = NSImage(cgImage: rendered, size: pointSize)
+        result.flattensJPEGOntoWhite = true
+        return result
+    }
+
     /// Draw a rounded-clipped image with its drop shadow cast from the image's
     /// OWN rounded edge — no separate opaque caster fill. This avoids the thin
     /// rim that the fill-a-rounded-rect approach leaves around the screenshot

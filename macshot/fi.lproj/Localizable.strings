@@ -165,6 +165,7 @@
 "Smart" = "Älykäs";
 "Padding" = "Reunus";
 "Shadow" = "Varjo";
+"Drop Shadow" = "Varjo";
 "Right-click to add points" = "Lisää pisteet hiiren oikealla painikkeella";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "Pidä 1 automaattinen pystysuunta  ·  Pidä 2 automaattinen vaakasuunta";
 "Limit to selection" = "Rajoita valintaan";

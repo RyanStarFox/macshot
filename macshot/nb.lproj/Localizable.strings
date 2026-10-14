@@ -165,6 +165,7 @@
 "Smart" = "Smart";
 "Padding" = "Utfylling";
 "Shadow" = "Skygge";
+"Drop Shadow" = "Skygge";
 "Right-click to add points" = "H\U00F8yreklikk for \U00E5 legge til punkter";
 "Hold 1 auto-vertical  \U00B7  Hold 2 auto-horizontal" = "Hold 1 auto-vertikal  \U00B7  Hold 2 auto-horisontal";
 "Limit to selection" = "Begrens til utvalg";

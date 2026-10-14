@@ -431,6 +431,11 @@ class DetachedEditorWindowController: NSObject, NSWindowDelegate {
         }
         if let view = overlayView, view.beautifyEnabled {
             result = BeautifyRenderer.render(image: result, config: view.beautifyConfig)
+        } else if let view = overlayView, view.transparentShadowActive {
+            result = BeautifyRenderer.renderTransparentShadow(
+                image: result,
+                shadowRadius: min(max(view.screenshotShadowRadius, 0), 100),
+                cornerRadius: 0)
         }
         return result
     }

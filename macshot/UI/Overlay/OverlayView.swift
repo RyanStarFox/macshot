@@ -481,6 +481,18 @@ class OverlayView: NSView {
         return v != nil ? CGFloat(v!) : 8
     }()
 
+    /// Drop shadow composited on a transparent canvas. Off by default.
+    var screenshotShadowEnabled: Bool = UserDefaults.standard.bool(forKey: "screenshotShadowEnabled")
+    var screenshotShadowRadius: CGFloat = {
+        let v = UserDefaults.standard.object(forKey: "screenshotShadowRadius") as? Double
+        return v != nil ? CGFloat(v!) : 20
+    }()
+    /// True when this shadow, not beautify, should be baked into the output.
+    var transparentShadowActive: Bool {
+        screenshotShadowEnabled && !beautifyEnabled && screenshotShadowRadius > 0
+    }
+    var showShadowInOptionsRow: Bool = false
+
     var customBeautifyBackground: NSImage? {
         didSet { cachedBeautifyBgCGImage = nil }
     }
@@ -1791,6 +1803,14 @@ class OverlayView: NSView {
 
         // Draw clear selection region
         if state != .idle && selectionRect.width >= 1 && selectionRect.height >= 1 {
+            // Transparent drop shadow sits on the desktop, under annotations.
+            // Beautify paints its own shadow later and must not stack on this one.
+            if transparentShadowActive && !isScrollCapturing && !isRecording && !beautifyEnabled {
+                context.saveGraphicsState()
+                applyCanvasTransform(to: context)
+                drawTransparentShadowPreview(context: context)
+                context.restoreGraphicsState()
+            }
             // During scroll capture: punch a fully-transparent hole so the live screen
             // content underneath shows through the overlay window.
             if isScrollCapturing {
@@ -1801,7 +1821,9 @@ class OverlayView: NSView {
 
             // Draw screenshot clipped to selection (image never bleeds outside).
             // In editor mode this is already handled by the detached draw block above.
-            if shouldClipSelectionImage() {
+            // The transparent-shadow preview already revealed this region, including
+            // effects. Redrawing the plain screenshot here would cover that.
+            if shouldClipSelectionImage() && !transparentShadowActive {
                 context.saveGraphicsState()
                 NSBezierPath(rect: selectionRect).setClip()
                 if !isScrollCapturing, !isRecording, usesExternalScreenshotPreview, zoomLevel == 1 {
@@ -1988,7 +2010,8 @@ class OverlayView: NSView {
 
             // Live beautify preview — draw gradient background, shadow, and rounded image around selection
             let showBeautifyPreview = beautifyEnabled && state == .selected && !isScrollCapturing && !isRecording
-            let showEffectsPreview = effectsActive && state == .selected && !isScrollCapturing && !isRecording && !beautifyEnabled
+            let showTransparentShadowPreview = transparentShadowActive && state == .selected && !isScrollCapturing && !isRecording
+            let showEffectsPreview = effectsActive && state == .selected && !isScrollCapturing && !isRecording && !beautifyEnabled && !showTransparentShadowPreview
 
             if showBeautifyPreview {
                 context.saveGraphicsState()
@@ -3129,6 +3152,40 @@ class OverlayView: NSView {
     /// The expanded rect including beautify padding (for live preview).
 
 
+    /// Live preview of the transparent drop shadow. Draws under annotations.
+    /// The margin around the selection is the desktop screenshot, not a gradient.
+    private func drawTransparentShadowPreview(context: NSGraphicsContext) {
+        let radius = min(max(screenshotShadowRadius, 0), 100)
+        guard radius > 0 else { return }
+        let bleed = BeautifyRenderer.shadowBleed(for: radius)
+        let expanded = selectionRect.insetBy(dx: -bleed, dy: -bleed)
+
+        if !isEditorMode, let image = screenshotImage {
+            context.cgContext.saveGState()
+            NSBezierPath(rect: expanded).addClip()
+            let base = effectsActive ? effectsProcessedScreenshot(image) : image
+            base.draw(in: bounds, from: .zero, operation: .copy, fraction: 1.0)
+            context.cgContext.restoreGState()
+        }
+
+        let windowCaster: NSImage? = {
+            guard selectionIsWindowSnap, let windowImage = snappedWindowImage else { return nil }
+            return effectsActive ? ImageEffects.apply(to: windowImage, config: effectsConfig) : windowImage
+        }()
+        let screenshotCaster: NSImage? = {
+            guard windowCaster == nil, let image = screenshotImage else { return nil }
+            return effectsActive ? effectsProcessedScreenshot(image) : image
+        }()
+
+        BeautifyRenderer.drawCasterShadow(radius: radius, context: context.cgContext) {
+            if let windowCaster {
+                windowCaster.draw(in: self.selectionRect, from: .zero, operation: .sourceOver, fraction: 1.0)
+            } else if let screenshotCaster {
+                screenshotCaster.draw(in: self.selectionRect, from: self.selectionRect, operation: .sourceOver, fraction: 1.0)
+            }
+        }
+    }
+
     private func drawBeautifyPreview(context: NSGraphicsContext) {
         let config = beautifyConfig
         let pad = config.padding
@@ -3438,7 +3495,7 @@ class OverlayView: NSView {
         case .text:
             return true
         default:
-            return showBeautifyInOptionsRow
+            return showBeautifyInOptionsRow || showShadowInOptionsRow
         }
     }
 
@@ -3469,6 +3526,15 @@ class OverlayView: NSView {
         UserDefaults.standard.set(enabled, forKey: "beautifyEnabled")
         cachedCompositedImage = nil
         startBeautifyToolbarAnimation()
+        needsDisplay = true
+        onContentChanged?()
+    }
+
+    func setScreenshotShadowEnabled(_ enabled: Bool) {
+        guard screenshotShadowEnabled != enabled else { return }
+        screenshotShadowEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "screenshotShadowEnabled")
+        cachedCompositedImage = nil
         needsDisplay = true
         onContentChanged?()
     }
@@ -5130,14 +5196,16 @@ class OverlayView: NSView {
             selectedTool: currentTool, selectedColor: currentColor,
             beautifyEnabled: beautifyEnabled, beautifyStyleIndex: beautifyStyleIndex,
             hasAnnotations: movableAnnotations, isRecording: isRecording,
-            effectsActive: effectsActive
+            effectsActive: effectsActive, screenshotShadowEnabled: screenshotShadowEnabled
         )
-        if showBeautifyInOptionsRow {
+        if showBeautifyInOptionsRow || showShadowInOptionsRow {
             for i in bottomButtons.indices {
                 if case .tool = bottomButtons[i].action {
                     bottomButtons[i].isSelected = false
                 } else if case .beautify = bottomButtons[i].action {
-                    bottomButtons[i].isSelected = true
+                    bottomButtons[i].isSelected = showBeautifyInOptionsRow
+                } else if case .screenshotShadow = bottomButtons[i].action {
+                    bottomButtons[i].isSelected = showShadowInOptionsRow
                 }
             }
         }
@@ -5257,6 +5325,9 @@ class OverlayView: NSView {
             )
         } else if beautifyEnabled && !isScrollCapturing && !isRecording {
             anchorRect = expandedAnchor
+        } else if transparentShadowActive && !isScrollCapturing && !isRecording {
+            let bleed = BeautifyRenderer.shadowBleed(for: min(max(screenshotShadowRadius, 0), 100))
+            anchorRect = selectionRect.insetBy(dx: -bleed, dy: -bleed)
         } else {
             anchorRect = selectionRect
         }
@@ -8150,6 +8221,7 @@ class OverlayView: NSView {
         case .tool(let tool):
             commitTextFieldIfNeeded()
             showBeautifyInOptionsRow = false  // switch back to tool options
+            showShadowInOptionsRow = false
             currentTool = tool
             // Auto-select first emoji when switching to stamp tool with nothing selected
             if tool == .stamp && currentStampImage == nil {
@@ -8298,7 +8370,13 @@ class OverlayView: NSView {
             // Load the custom background eagerly if that style is selected (the
             // beautifyConfig getter no longer does this as a side effect).
             ensureCustomBeautifyBackgroundLoaded()
+            showShadowInOptionsRow = false
             showBeautifyInOptionsRow = true
+            needsDisplay = true
+        case .screenshotShadow:
+            commitTextFieldIfNeeded()
+            showBeautifyInOptionsRow = false
+            showShadowInOptionsRow = true
             needsDisplay = true
         case .beautifyStyle:
             beautifyStyleIndex = (beautifyStyleIndex + 1) % BeautifyRenderer.styles.count
@@ -10198,6 +10276,9 @@ class OverlayView: NSView {
             UserDefaults.standard.object(forKey: "beautifyCornerRadius") as? Double ?? 10)
         beautifyShadowRadius = CGFloat(
             UserDefaults.standard.object(forKey: "beautifyShadowRadius") as? Double ?? 20)
+        screenshotShadowEnabled = UserDefaults.standard.bool(forKey: "screenshotShadowEnabled")
+        screenshotShadowRadius = CGFloat(
+            UserDefaults.standard.object(forKey: "screenshotShadowRadius") as? Double ?? 20)
         beautifyBgRadius = CGFloat(
             UserDefaults.standard.object(forKey: "beautifyBgRadius") as? Double ?? 8)
         // The custom-style background is loaded here (not lazily in the

@@ -107,6 +107,8 @@ final class LegacyDecodingTests: XCTestCase {
         XCTAssertEqual(state.beautifyBackgroundBlur, 0, "a field added later takes its default")
         XCTAssertFalse(state.beautifyIsWindowSnap)
         XCTAssertNil(state.customBeautifyBackgroundPNG)
+        XCTAssertFalse(state.screenshotShadowEnabled, "a shadow field added later stays off")
+        XCTAssertEqual(state.screenshotShadowRadius, 20)
         XCTAssertEqual(state.effectsBrightness, 0.2, accuracy: 0.0001)
     }
 
@@ -122,6 +124,8 @@ final class LegacyDecodingTests: XCTestCase {
         state.beautifyPadding = 100
         state.beautifyBackgroundBlur = 12
         state.effectsSaturation = 1.4
+        state.screenshotShadowEnabled = true
+        state.screenshotShadowRadius = 36
         state.customBeautifyBackgroundPNG = ImageProbe.quadrantImage(width: 8, height: 8)
             .tiffRepresentation.flatMap { NSBitmapImageRep(data: $0)?.representation(using: .png, properties: [:]) }
 
@@ -133,7 +137,8 @@ final class LegacyDecodingTests: XCTestCase {
     func testEditStateBoundsValuesBeforePassingThemToRendering() throws {
         let data = Data("""
         {"effectsBrightness":3,"effectsContrast":-2,"effectsSaturation":5,"effectsSharpness":-1,
-         "beautifyPadding":-10,"beautifyCornerRadius":-5,"beautifyShadowRadius":120,"beautifyBackgroundBlur":75}
+         "beautifyPadding":-10,"beautifyCornerRadius":-5,"beautifyShadowRadius":120,"beautifyBackgroundBlur":75,
+         "screenshotShadowRadius":150}
         """.utf8)
         let state = try JSONDecoder().decode(CaptureEditState.self, from: data)
         XCTAssertEqual(state.effectsBrightness, 0.5)
@@ -144,6 +149,7 @@ final class LegacyDecodingTests: XCTestCase {
         XCTAssertEqual(state.beautifyCornerRadius, 0)
         XCTAssertEqual(state.beautifyShadowRadius, 100)
         XCTAssertEqual(state.beautifyBackgroundBlur, 50)
+        XCTAssertEqual(state.screenshotShadowRadius, 100)
         var inMemory = CaptureEditState()
         inMemory.effectsBrightness = .nan
         inMemory.beautifyPadding = .infinity
@@ -153,6 +159,33 @@ final class LegacyDecodingTests: XCTestCase {
         overlay.applyCaptureEditState(inMemory)
         XCTAssertEqual(overlay.effectsBrightness, 0)
         XCTAssertEqual(overlay.beautifyPadding, 48)
+    }
+
+    func testTransparentShadowCountsAsPostProcessingUntilBeautifyTakesOver() {
+        var state = CaptureEditState()
+        XCTAssertFalse(state.hasPostProcessing)
+        state.screenshotShadowEnabled = true
+        XCTAssertTrue(state.hasTransparentShadow)
+        state.beautifyEnabled = true
+        XCTAssertFalse(state.hasTransparentShadow, "beautify keeps its own background shadow")
+        XCTAssertTrue(state.hasPostProcessing)
+        state.beautifyEnabled = false
+        state.screenshotShadowRadius = 0
+        XCTAssertFalse(state.hasTransparentShadow)
+    }
+
+    /// Every stored field has to be listed. A new one that is missing from
+    /// `init(from:)` silently drops data saved by the current build.
+    func testEditStateCensusListsEveryStoredProperty() {
+        let actual = Set(Reflect.propertyNames(of: CaptureEditState()))
+        let expected: Set<String> = [
+            "effectsPresetRaw", "effectsBrightness", "effectsContrast", "effectsSaturation", "effectsSharpness",
+            "beautifyEnabled", "beautifyModeRaw", "beautifyStyleIndex", "beautifyPadding",
+            "beautifyCornerRadius", "beautifyShadowRadius", "beautifyBackgroundBlur",
+            "beautifyIsWindowSnap", "customBeautifyBackgroundPNG",
+            "screenshotShadowEnabled", "screenshotShadowRadius",
+        ]
+        XCTAssertEqual(actual, expected)
     }
 
     // MARK: - History index

@@ -160,6 +160,7 @@
 "Smart" = "智慧型";
 "Padding" = "間距";
 "Shadow" = "陰影";
+"Drop Shadow" = "投影";
 "Right-click to add points" = "右鍵點按以加入控制點";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "按住 1 自動垂直  ·  按住 2 自動水平";
 "Limit to selection" = "限制在選取範圍內";

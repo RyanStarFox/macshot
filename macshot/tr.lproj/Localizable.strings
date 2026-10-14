@@ -154,6 +154,7 @@
 "Smart" = "Akıllı";
 "Padding" = "Dolgu";
 "Shadow" = "Gölge";
+"Drop Shadow" = "Gölge";
 "Right-click to add points" = "Nokta eklemek için sağ tıklayın";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "1 basılı tut: otomatik dikey  ·  2 basılı tut: otomatik yatay";
 "Limit to selection" = "Seçimle sınırla";

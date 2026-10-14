@@ -158,6 +158,7 @@
 "Smart" = "Okos";
 "Padding" = "Margó";
 "Shadow" = "Árnyék";
+"Drop Shadow" = "Vetett árnyék";
 "Right-click to add points" = "Jobb kattintás pontok hozzáadásához";
 "Hold 1 auto-vertical  ·  Hold 2 auto-horizontal" = "Tartsd az 1-et automatikus függőlegeshez  ·  Tartsd a 2-t automatikus vízszinteshez";
 "Limit to selection" = "Korlátozás a kijelölésre";
