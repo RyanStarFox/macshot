@@ -343,13 +343,17 @@ class ToolbarLayout {
         }
     }
 
-    /// Appearance matching the effective toolbar background brightness.
-    /// Dark background → `.darkAqua`, light background → `.aqua`.
-    static var appearance: NSAppearance? {
-        let color = bgColor.usingColorSpace(.deviceRGB) ?? bgColor
+    /// Appearance matching a toolbar background. Dark background → `.darkAqua`, light background → `.aqua`.
+    static func appearance(matching color: NSColor) -> NSAppearance? {
+        let color = color.usingColorSpace(.deviceRGB) ?? color
         var brightness: CGFloat = 0
         color.getHue(nil, saturation: nil, brightness: &brightness, alpha: nil)
         return NSAppearance(named: brightness > 0.5 ? .aqua : .darkAqua)
+    }
+
+    /// Appearance matching the effective toolbar background brightness.
+    static var appearance: NSAppearance? {
+        appearance(matching: bgColor)
     }
 
     /// Save background color to UserDefaults.

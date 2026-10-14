@@ -19,7 +19,7 @@ final class HUDAppearanceTests: XCTestCase {
             XCTAssertEqual(brightness(colors.background), brightness(ToolbarLayout.defaultBgColor), accuracy: 0.001)
             XCTAssertLessThan(brightness(colors.background), 0.5)
             XCTAssertGreaterThan(brightness(colors.icon), 0.9)
-            XCTAssertEqual(ToolbarLayout.appearance?.name, .darkAqua)
+            XCTAssertEqual(ToolbarLayout.appearance(matching: colors.background)?.name, .darkAqua)
         }
     }
 
@@ -46,7 +46,7 @@ final class HUDAppearanceTests: XCTestCase {
             let colors = ToolbarLayout.colors(using: darkAqua)
             XCTAssertGreaterThan(brightness(colors.background), 0.5)
             XCTAssertLessThan(brightness(colors.icon), 0.5)
-            XCTAssertEqual(ToolbarLayout.appearance?.name, .aqua)
+            XCTAssertEqual(ToolbarLayout.appearance(matching: colors.background)?.name, .aqua)
         }
     }
 
