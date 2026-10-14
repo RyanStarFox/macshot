@@ -1145,6 +1145,7 @@ class OverlayView: NSView {
         if let tool = toolOptionsRowView?.currentTool {
             toolOptionsRowView?.rebuild(for: tool)
         }
+        editorTooltipView?.needsDisplay = true
         needsDisplay = true
     }
 
@@ -10342,6 +10343,18 @@ private final class PreSelectionPresetButton: NSButton {
             symbol?.isTemplate = true
             image = symbol
         }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(hudColorsChanged),
+            name: .toolbarColorsDidChange, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func hudColorsChanged() {
+        contentTintColor = activePreset ? ToolbarLayout.accentColor : ToolbarLayout.iconColor.withAlphaComponent(0.88)
+        needsDisplay = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
