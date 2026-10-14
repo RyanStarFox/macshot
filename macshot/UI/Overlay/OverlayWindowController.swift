@@ -551,38 +551,8 @@ class OverlayWindowController {
         // Apply beautify second (gradient background wrapping)
         if view.beautifyEnabled {
             result = BeautifyRenderer.render(image: result, config: view.beautifyConfig)
-        } else if view.transparentShadowActive {
-            result = applyTransparentShadow(
-                to: result,
-                snapImage: view.selectionIsWindowSnap ? view.snappedWindowImage : nil,
-                annotations: view.annotations,
-                selectionRect: view.selectionRect,
-                effectsActive: view.effectsActive,
-                effectsConfig: view.effectsConfig,
-                radius: min(max(view.screenshotShadowRadius, 0), 100))
         }
         return result
-    }
-
-    /// Drop shadow on a transparent canvas. A snapped window is shadowed from
-    /// its own alpha; beautify is handled by the caller and never reaches here.
-    private func applyTransparentShadow(
-        to image: NSImage,
-        snapImage: NSImage?,
-        annotations: [Annotation],
-        selectionRect: NSRect,
-        effectsActive: Bool,
-        effectsConfig: ImageEffectsConfig,
-        radius: CGFloat
-    ) -> NSImage {
-        guard radius > 0 else { return image }
-        var input = image
-        if let snapImage {
-            let snapped = compositeAnnotationsOnSnappedWindow(
-                snapImage, annotations: annotations, selectionRect: selectionRect)
-            input = effectsActive ? ImageEffects.apply(to: snapped, config: effectsConfig) : snapped
-        }
-        return BeautifyRenderer.renderTransparentShadow(image: input, shadowRadius: radius, cornerRadius: 0)
     }
 
     private func copyImageToClipboard(_ image: NSImage) {
@@ -622,8 +592,6 @@ extension OverlayWindowController: OverlayViewDelegate {
         let effectsCfg = overlayView?.effectsConfig ?? ImageEffectsConfig()
         let hasBeautify = overlayView?.beautifyEnabled ?? false
         let beautifyCfg = overlayView?.beautifyConfig ?? BeautifyConfig()
-        let hasTransparentShadow = overlayView?.transparentShadowActive ?? false
-        let transparentShadowRadius = min(max(overlayView?.screenshotShadowRadius ?? 0, 0), 100)
         let snapWindowImg = overlayView?.snappedWindowImage
 
         // Capture the composited image (screenshot + annotations baked in).
@@ -643,7 +611,7 @@ extension OverlayWindowController: OverlayViewDelegate {
         // so the editor shows clean corners when re-editing.
         let hasAnnotations = overlayView?.annotations.contains(where: { $0.isMovable }) ?? false
         let annotationData: CaptureAnnotationData?
-        if hasAnnotations || hasEffects || hasBeautify || hasTransparentShadow {
+        if hasAnnotations || hasEffects || hasBeautify {
             let rawImage: NSImage? = (beautifyCfg.isWindowSnap && snapWindowImg != nil)
                 ? snapWindowImg : overlayView?.captureSelectedRegionRaw()
             if let raw = rawImage {
@@ -677,15 +645,6 @@ extension OverlayWindowController: OverlayViewDelegate {
                 beautifyInput = hasEffects ? ImageEffects.apply(to: snapped, config: effectsCfg) : snapped
             }
             finalImage = BeautifyRenderer.render(image: beautifyInput, config: beautifyCfg)
-        } else if hasTransparentShadow {
-            finalImage = applyTransparentShadow(
-                to: finalImage,
-                snapImage: beautifyCfg.isWindowSnap ? snapWindowImg : nil,
-                annotations: snapshotAnnotations,
-                selectionRect: snapshotSelRect,
-                effectsActive: hasEffects,
-                effectsConfig: effectsCfg,
-                radius: transparentShadowRadius)
         }
 
         // Copy button / Cmd+C always copies to clipboard
@@ -1015,8 +974,6 @@ extension OverlayWindowController: OverlayViewDelegate {
         let effectsCfg = overlayView?.effectsConfig ?? ImageEffectsConfig()
         let hasBeautify = overlayView?.beautifyEnabled ?? false
         let beautifyCfg = overlayView?.beautifyConfig ?? BeautifyConfig()
-        let hasTransparentShadow = overlayView?.transparentShadowActive ?? false
-        let transparentShadowRadius = min(max(overlayView?.screenshotShadowRadius ?? 0, 0), 100)
         let snapWindowImg = overlayView?.snappedWindowImage
 
         guard let compositedImage = captureRegion() else {
@@ -1032,7 +989,7 @@ extension OverlayWindowController: OverlayViewDelegate {
         // Snapshot annotation data — use snapped window image for clean corners
         let hasAnnotations = overlayView?.annotations.contains(where: { $0.isMovable }) ?? false
         let annotationData: CaptureAnnotationData?
-        if hasAnnotations || hasEffects || hasBeautify || hasTransparentShadow {
+        if hasAnnotations || hasEffects || hasBeautify {
             let rawImage: NSImage? = (beautifyCfg.isWindowSnap && snapWindowImg != nil)
                 ? snapWindowImg : overlayView?.captureSelectedRegionRaw()
             if let raw = rawImage {
@@ -1057,15 +1014,6 @@ extension OverlayWindowController: OverlayViewDelegate {
                 beautifyInput = hasEffects ? ImageEffects.apply(to: snapped, config: effectsCfg) : snapped
             }
             image = BeautifyRenderer.render(image: beautifyInput, config: beautifyCfg)
-        } else if hasTransparentShadow {
-            image = applyTransparentShadow(
-                to: image,
-                snapImage: beautifyCfg.isWindowSnap ? snapWindowImg : nil,
-                annotations: snapshotAnns,
-                selectionRect: snapshotSel,
-                effectsActive: hasEffects,
-                effectsConfig: effectsCfg,
-                radius: transparentShadowRadius)
         }
 
         let mode = QuickCaptureMode.current
@@ -1149,8 +1097,6 @@ extension OverlayWindowController: OverlayViewDelegate {
         let effectsCfg = overlayView?.effectsConfig ?? ImageEffectsConfig()
         let hasBeautify = overlayView?.beautifyEnabled ?? false
         let beautifyCfg = overlayView?.beautifyConfig ?? BeautifyConfig()
-        let hasTransparentShadow = overlayView?.transparentShadowActive ?? false
-        let transparentShadowRadius = min(max(overlayView?.screenshotShadowRadius ?? 0, 0), 100)
         let snapWindowImg = overlayView?.snappedWindowImage
         let snapshotAnns = overlayView?.annotations ?? []
         let snapshotSel = overlayView?.selectionRect ?? .zero
@@ -1167,15 +1113,6 @@ extension OverlayWindowController: OverlayViewDelegate {
                 beautifyInput = hasEffects ? ImageEffects.apply(to: snapped, config: effectsCfg) : snapped
             }
             image = BeautifyRenderer.render(image: beautifyInput, config: beautifyCfg)
-        } else if hasTransparentShadow {
-            image = applyTransparentShadow(
-                to: image,
-                snapImage: beautifyCfg.isWindowSnap ? snapWindowImg : nil,
-                annotations: snapshotAnns,
-                selectionRect: snapshotSel,
-                effectsActive: hasEffects,
-                effectsConfig: effectsCfg,
-                radius: transparentShadowRadius)
         }
         return image
     }

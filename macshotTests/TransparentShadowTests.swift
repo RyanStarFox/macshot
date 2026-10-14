@@ -1,49 +1,47 @@
 import Cocoa
 import XCTest
 
-/// The transparent drop shadow is a different output from beautify: the pixels
-/// outside the image are clear, and the shadow itself is black with partial alpha.
+/// Beautify can leave its padding clear. The shadow is the one beautify already
+/// draws, and the canvas stays image + padding — the radius slider does not
+/// grow the output.
 final class TransparentShadowTests: XCTestCase {
 
-    func testRadiusZeroDoesNotExpandTheCanvas() {
-        let image = ImageProbe.solidImage(width: 40, height: 30)
-        let result = BeautifyRenderer.renderTransparentShadow(image: image, shadowRadius: 0)
-        XCTAssertEqual(result.size, image.size)
-    }
-
-    func testShadowSitsOnTransparency() {
+    func testNoBackgroundKeepsTheShadowInsideThePadding() {
         let width = 40
         let height = 30
-        let radius: CGFloat = 20
+        let padding: CGFloat = 24
         let image = ImageProbe.solidImage(
             width: width, height: height,
             color: CGColor(srgbRed: 1, green: 0.2, blue: 0.6, alpha: 1))
-        let result = BeautifyRenderer.renderTransparentShadow(image: image, shadowRadius: radius, cornerRadius: 0)
-        let bleed = BeautifyRenderer.shadowBleed(for: radius)
+        var config = BeautifyConfig()
+        config.mode = .rounded
+        config.padding = padding
+        config.cornerRadius = 0
+        config.shadowRadius = 20
+        config.backgroundEnabled = false
 
-        XCTAssertEqual(result.size.width, CGFloat(width) + bleed * 2, accuracy: 0.01)
-        XCTAssertEqual(result.size.height, CGFloat(height) + bleed * 2, accuracy: 0.01)
+        let result = BeautifyRenderer.render(image: image, config: config)
+        XCTAssertEqual(result.size.width, CGFloat(width) + padding * 2, accuracy: 0.01)
+        XCTAssertEqual(result.size.height, CGFloat(height) + padding * 2, accuracy: 0.01)
+        XCTAssertTrue(result.flattensJPEGOntoWhite)
 
-        let margin = Int(bleed.rounded())
         let corner = ImageProbe.pixelColor(result, x: 0, y: 0)
-        XCTAssertNotNil(corner)
-        XCTAssertEqual(corner?.alphaComponent ?? 1, 0, accuracy: 0.02, "the canvas corner stays clear")
+        XCTAssertEqual(corner?.alphaComponent ?? 1, 0, accuracy: 0.02, "the padding corner stays clear")
 
+        let margin = Int(padding)
         let center = ImageProbe.pixelColor(result, x: margin + width / 2, y: margin + height / 2)
         XCTAssertEqual(center?.alphaComponent ?? 0, 1, accuracy: 0.02)
         XCTAssertEqual(center?.redComponent ?? 0, 1, accuracy: 0.05)
-        XCTAssertEqual(center?.greenComponent ?? 0, 0.2, accuracy: 0.05)
-        XCTAssertEqual(center?.blueComponent ?? 0, 0.6, accuracy: 0.05)
 
-        // AppKit draws the offset downward, which is toward the bottom of the bitmap.
-        let shadow = ImageProbe.pixelColor(result, x: margin + width / 2, y: margin + height + 8)
-        XCTAssertNotNil(shadow)
-        let alpha = shadow?.alphaComponent ?? 0
-        XCTAssertGreaterThan(alpha, 0.02)
-        XCTAssertLessThan(alpha, 1)
+        // The offset points downward, which is toward the bottom of the bitmap.
+        let shadow = ImageProbe.pixelColor(result, x: margin + width / 2, y: margin + height + 6)
+        XCTAssertGreaterThan(shadow?.alphaComponent ?? 0, 0.02)
+        XCTAssertLessThan(shadow?.alphaComponent ?? 1, 1)
         XCTAssertLessThan(shadow?.redComponent ?? 1, 0.2)
-        XCTAssertLessThan(shadow?.greenComponent ?? 1, 0.2)
-        XCTAssertLessThan(shadow?.blueComponent ?? 1, 0.2)
+
+        config.shadowRadius = 100
+        let wider = BeautifyRenderer.render(image: image, config: config)
+        XCTAssertEqual(wider.size, result.size, "raising the radius must not grow the canvas")
     }
 
     func testATransparentCornerStillShapesTheShadow() {
@@ -52,18 +50,21 @@ final class TransparentShadowTests: XCTestCase {
             context.fill(CGRect(x: 10, y: 0, width: 30, height: 40))
             context.fill(CGRect(x: 0, y: 10, width: 10, height: 30))
         }
-        let result = BeautifyRenderer.renderTransparentShadow(image: image, shadowRadius: 16, cornerRadius: 0)
-        let bleed = Int(BeautifyRenderer.shadowBleed(for: 16).rounded())
+        var config = BeautifyConfig()
+        config.isWindowSnap = true
+        config.padding = 16
+        config.shadowRadius = 12
+        config.backgroundEnabled = false
+        let result = BeautifyRenderer.render(image: image, config: config)
+        let pad = 16
         let totalH = Int(result.size.height.rounded())
-        // Bitmap y counts from the top. The empty region is the source's bottom-left.
-        func bitmapY(sourceYFromBottom: Int) -> Int { totalH - 1 - (bleed + sourceYFromBottom) }
-        let emptyCorner = ImageProbe.pixelColor(result, x: bleed + 2, y: bitmapY(sourceYFromBottom: 2))
-        // A white caster plate would leave this pixel opaque. A real shadow is only partial black.
+        func bitmapY(sourceYFromBottom: Int) -> Int { totalH - 1 - (pad + sourceYFromBottom) }
+        let emptyCorner = ImageProbe.pixelColor(result, x: pad + 2, y: bitmapY(sourceYFromBottom: 2))
         XCTAssertLessThan(emptyCorner?.alphaComponent ?? 1, 0.99)
         if let emptyCorner, emptyCorner.alphaComponent > 0.05 {
             XCTAssertLessThan(emptyCorner.redComponent, 0.5)
         }
-        let body = ImageProbe.pixelColor(result, x: bleed + 20, y: bitmapY(sourceYFromBottom: 20))
+        let body = ImageProbe.pixelColor(result, x: pad + 20, y: bitmapY(sourceYFromBottom: 20))
         XCTAssertEqual(body?.alphaComponent ?? 0, 1, accuracy: 0.02)
     }
 
@@ -79,12 +80,19 @@ final class TransparentShadowTests: XCTestCase {
         let corner = ImageProbe.pixelColor(result, x: 0, y: 0)
         XCTAssertEqual(corner?.alphaComponent ?? 0, 1, accuracy: 0.02,
                        "beautify's shadow is composited onto its background")
+        XCTAssertFalse(result.flattensJPEGOntoWhite)
     }
 
     func testJPEGMatsTheShadowOntoWhite() throws {
         guard ImageEncoder.isFormatAvailable(.jpeg) else { return }
         let image = ImageProbe.solidImage(width: 24, height: 18)
-        let shadowed = BeautifyRenderer.renderTransparentShadow(image: image, shadowRadius: 12)
+        var config = BeautifyConfig()
+        config.mode = .rounded
+        config.padding = 12
+        config.cornerRadius = 0
+        config.shadowRadius = 12
+        config.backgroundEnabled = false
+        let shadowed = BeautifyRenderer.render(image: image, config: config)
         XCTAssertTrue(shadowed.flattensJPEGOntoWhite)
 
         var data: Data?

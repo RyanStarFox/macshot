@@ -43,7 +43,6 @@ enum ToolbarButtonAction {
     case webcam
     case recordSettings  // recording mode: open format/FPS/when-done popover
     case effects  // image effects (CIFilter adjustments + presets)
-    case screenshotShadow  // drop shadow on a transparent canvas
 }
 
 struct ToolbarButton {
@@ -73,7 +72,6 @@ enum ToolbarCustomAction: Int {
     case invertColors = 1011
     case share = 1012
     case effects = 1013
-    case screenshotShadow = 1014
 
     static var allKnownActions: [ToolbarCustomAction] {
         var actions: [ToolbarCustomAction] = []
@@ -81,14 +79,14 @@ enum ToolbarCustomAction: Int {
         actions.append(.upload)
         #endif
         actions.append(contentsOf: [
-            .pin, .ocr, .beautify, .screenshotShadow, .removeBackground, .autoRedact, .reserved1007,
+            .pin, .ocr, .beautify, .removeBackground, .autoRedact, .reserved1007,
             .translate, .record, .scrollCapture, .invertColors, .share, .effects,
         ])
         return actions
     }
 
     static var bottomToolbarActions: [ToolbarCustomAction] {
-        [.invertColors, .effects, .beautify, .screenshotShadow, .removeBackground]
+        [.invertColors, .effects, .beautify, .removeBackground]
     }
 
     static var rightToolbarActions: [ToolbarCustomAction] {
@@ -130,7 +128,6 @@ enum ToolbarCustomAction: Int {
         case .invertColors: return L("Invert Colors")
         case .share: return L("Share")
         case .effects: return L("Adjust (Image Effects)")
-        case .screenshotShadow: return L("Drop Shadow")
         }
     }
 
@@ -138,7 +135,6 @@ enum ToolbarCustomAction: Int {
         beautifyEnabled: Bool = false,
         translateEnabled: Bool = false,
         effectsActive: Bool = false,
-        screenshotShadowEnabled: Bool = false,
         isRecording: Bool = false,
         isEditorMode: Bool = false
     ) -> ToolbarButton? {
@@ -197,16 +193,6 @@ enum ToolbarCustomAction: Int {
             var button = ToolbarButton(action: .effects, sfSymbol: "slider.horizontal.3", tooltip: L("Adjust"))
             if effectsActive {
                 button.tintColor = NSColor(calibratedRed: 1.0, green: 0.8, blue: 0.2, alpha: 1.0)
-            }
-            return button
-        case .screenshotShadow:
-            let symbol = NSImage(systemSymbolName: "shadow", accessibilityDescription: nil) != nil
-                ? "shadow" : "square.on.square"
-            var button = ToolbarButton(action: .screenshotShadow, sfSymbol: symbol, tooltip: L("Drop Shadow"))
-            if screenshotShadowEnabled {
-                let enabledColor = NSColor(calibratedRed: 1.0, green: 0.8, blue: 0.2, alpha: 1.0)
-                button.tintColor = enabledColor
-                button.selectedTintColor = enabledColor
             }
             return button
         }
@@ -323,7 +309,7 @@ class ToolbarLayout {
     static func bottomButtons(
         selectedTool: AnnotationTool, selectedColor: NSColor, beautifyEnabled: Bool = false,
         beautifyStyleIndex: Int = 0, hasAnnotations: Bool = false, isRecording: Bool = false,
-        effectsActive: Bool = false, screenshotShadowEnabled: Bool = false
+        effectsActive: Bool = false
     ) -> [ToolbarButton] {
         // Hide the bottom bar entirely while recording
         if isRecording { return [] }
@@ -408,7 +394,6 @@ class ToolbarLayout {
             if let button = action.makeToolbarButton(
                 beautifyEnabled: beautifyEnabled,
                 effectsActive: effectsActive,
-                screenshotShadowEnabled: screenshotShadowEnabled,
                 isRecording: isRecording
             ) {
                 buttons.append(button)

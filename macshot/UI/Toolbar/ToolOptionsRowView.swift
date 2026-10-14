@@ -110,15 +110,6 @@ class ToolOptionsRowView: NSView {
         currentTool = tool
         var curX: CGFloat = padding
 
-        // ── Transparent drop-shadow options ──
-        if ov.showShadowInOptionsRow {
-            curX = addScreenshotShadowOptions(at: curX, ov: ov)
-            let totalW = max(curX + padding, 200)
-            contentWidth = totalW
-            frame.size = NSSize(width: totalW, height: rowHeight)
-            return
-        }
-
         // ── Beautify options (overrides tool options when active) ──
         if ov.showBeautifyInOptionsRow {
             curX = addBeautifyOptions(at: curX, ov: ov)
@@ -1287,50 +1278,6 @@ class ToolOptionsRowView: NSView {
         return curX
     }
 
-    private func addScreenshotShadowOptions(at x: CGFloat, ov: OverlayView) -> CGFloat {
-        var curX = x
-        let toggleBtn = NSButton(
-            checkboxWithTitle: L("Drop Shadow"), target: self,
-            action: #selector(screenshotShadowToggleChanged(_:)))
-        toggleBtn.state = ov.screenshotShadowEnabled ? .on : .off
-        toggleBtn.font = NSFont.systemFont(ofSize: 10, weight: .medium)
-        if let cell = toggleBtn.cell as? NSButtonCell {
-            cell.attributedTitle = NSAttributedString(string: L("Drop Shadow"), attributes: [
-                .foregroundColor: ToolbarLayout.iconColor.withAlphaComponent(0.85),
-                .font: NSFont.systemFont(ofSize: 10, weight: .medium)
-            ])
-        }
-        toggleBtn.sizeToFit()
-        toggleBtn.frame.origin = NSPoint(x: curX, y: (rowHeight - toggleBtn.frame.height) / 2)
-        addSubview(toggleBtn)
-        curX += toggleBtn.frame.width + 4
-
-        curX = addSeparator(at: curX)
-
-        // Beautify paints on its own background, so this radius does nothing then.
-        let sliderEnabled = ov.screenshotShadowEnabled && !ov.beautifyEnabled
-        curX = addBeautifySlider(
-            at: curX, label: L("Shadow"), value: ov.screenshotShadowRadius,
-            min: 0, max: 100, isEnabled: sliderEnabled,
-            action: #selector(screenshotShadowRadiusChanged(_:)))
-        return curX
-    }
-
-    @objc private func screenshotShadowToggleChanged(_ sender: NSButton) {
-        guard let ov = overlayView else { return }
-        ov.setScreenshotShadowEnabled(sender.state == .on)
-        ov.rebuildToolbarLayout()
-    }
-
-    @objc private func screenshotShadowRadiusChanged(_ sender: NSSlider) {
-        guard let ov = overlayView else { return }
-        ov.screenshotShadowRadius = CGFloat(sender.floatValue)
-        UserDefaults.standard.set(sender.doubleValue, forKey: "screenshotShadowRadius")
-        ov.cachedCompositedImage = nil
-        ov.needsDisplay = true
-        ov.onContentChanged?()
-    }
-
     private func addBeautifyOptions(at x: CGFloat, ov: OverlayView) -> CGFloat {
         var curX = x
         let isSnap = ov.selectionIsWindowSnap
@@ -1378,12 +1325,30 @@ class ToolOptionsRowView: NSView {
             curX = addBeautifySlider(at: curX, label: L("Radius"), value: ov.beautifyCornerRadius, min: 0, max: 30, isEnabled: controlsEnabled, action: #selector(beautifyCornerChanged(_:)))
         }
 
-        // Shadow slider
+        // Shadow slider. This is the same shadow beautify already draws.
         curX = addBeautifySlider(at: curX, label: L("Shadow"), value: ov.beautifyShadowRadius, min: 0, max: 100, isEnabled: controlsEnabled, action: #selector(beautifyShadowChanged(_:)))
+
+        let backgroundOn = ov.beautifyBackgroundEnabled
+        let bgBtn = NSButton(
+            checkboxWithTitle: L("Background"), target: self,
+            action: #selector(beautifyBackgroundChanged(_:)))
+        bgBtn.state = backgroundOn ? .on : .off
+        bgBtn.isEnabled = controlsEnabled
+        bgBtn.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+        if let cell = bgBtn.cell as? NSButtonCell {
+            cell.attributedTitle = NSAttributedString(string: L("Background"), attributes: [
+                .foregroundColor: ToolbarLayout.iconColor.withAlphaComponent(controlsEnabled ? 0.85 : 0.35),
+                .font: NSFont.systemFont(ofSize: 10, weight: .medium)
+            ])
+        }
+        bgBtn.sizeToFit()
+        bgBtn.frame.origin = NSPoint(x: curX, y: (rowHeight - bgBtn.frame.height) / 2)
+        addSubview(bgBtn)
+        curX += bgBtn.frame.width + 4
 
         // Blur slider — only shown for custom image backgrounds
         if ov.beautifyStyleIndex == -1 {
-            curX = addBeautifySlider(at: curX, label: L("Blur"), value: ov.beautifyBackgroundBlur, min: 0, max: 50, isEnabled: controlsEnabled, action: #selector(beautifyBlurChanged(_:)))
+            curX = addBeautifySlider(at: curX, label: L("Blur"), value: ov.beautifyBackgroundBlur, min: 0, max: 50, isEnabled: controlsEnabled && backgroundOn, action: #selector(beautifyBlurChanged(_:)))
         }
 
         curX = addSeparator(at: curX)
@@ -1398,7 +1363,7 @@ class ToolOptionsRowView: NSView {
         swatchBtn.imageScaling = .scaleProportionallyUpOrDown
         swatchBtn.target = self
         swatchBtn.action = #selector(beautifyGradientClicked(_:))
-        swatchBtn.isEnabled = controlsEnabled
+        swatchBtn.isEnabled = controlsEnabled && ov.beautifyBackgroundEnabled
         swatchBtn.toolTip = L("Gradient Style")
         swatchBtn.tag = 995
         addSubview(swatchBtn)
@@ -1411,7 +1376,7 @@ class ToolOptionsRowView: NSView {
             .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
         arrowBtn.target = self
         arrowBtn.action = #selector(beautifyGradientClicked(_:))
-        arrowBtn.isEnabled = controlsEnabled
+        arrowBtn.isEnabled = controlsEnabled && ov.beautifyBackgroundEnabled
         addSubview(arrowBtn)
         arrowBtn.contentTintColor = ToolbarLayout.iconColor.withAlphaComponent(0.6)
         curX += 18
@@ -1462,6 +1427,16 @@ class ToolOptionsRowView: NSView {
         guard let ov = overlayView else { return }
         ov.beautifyCornerRadius = CGFloat(sender.floatValue)
         UserDefaults.standard.set(sender.doubleValue, forKey: "beautifyCornerRadius")
+        ov.needsDisplay = true
+        ov.onContentChanged?()
+    }
+
+    @objc private func beautifyBackgroundChanged(_ sender: NSButton) {
+        guard let ov = overlayView else { return }
+        ov.beautifyBackgroundEnabled = sender.state == .on
+        UserDefaults.standard.set(sender.state == .on, forKey: "beautifyBackgroundEnabled")
+        ov.cachedCompositedImage = nil
+        ov.rebuildToolbarLayout()
         ov.needsDisplay = true
         ov.onContentChanged?()
     }
