@@ -2504,14 +2504,28 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
     private static let labelColumnWidth: CGFloat = 180
 
     /// A horizontal row: right-aligned label on the left, controls on the right.
+    /// The label is pinned to the trailing edge of a fixed column so short
+    /// titles such as "界面:" line up with longer ones such as "菜单栏图标:".
     private func labeledRow(_ labelText: String, controls: [NSView]) -> NSView {
         let lbl = NSTextField(labelWithString: labelText)
         lbl.font = NSFont.systemFont(ofSize: 13)
         lbl.alignment = .right
         lbl.translatesAutoresizingMaskIntoConstraints = false
-        lbl.widthAnchor.constraint(equalToConstant: Self.labelColumnWidth).isActive = true
+        lbl.setContentHuggingPriority(.required, for: .horizontal)
+        lbl.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let row = NSStackView(views: [lbl] + controls)
+        let labelBox = NSView()
+        labelBox.translatesAutoresizingMaskIntoConstraints = false
+        labelBox.addSubview(lbl)
+        NSLayoutConstraint.activate([
+            labelBox.widthAnchor.constraint(equalToConstant: Self.labelColumnWidth),
+            lbl.trailingAnchor.constraint(equalTo: labelBox.trailingAnchor),
+            lbl.leadingAnchor.constraint(greaterThanOrEqualTo: labelBox.leadingAnchor),
+            lbl.topAnchor.constraint(equalTo: labelBox.topAnchor),
+            lbl.bottomAnchor.constraint(equalTo: labelBox.bottomAnchor),
+        ])
+
+        let row = NSStackView(views: [labelBox] + controls)
         row.orientation = .horizontal
         row.spacing = 8
         row.alignment = .centerY
