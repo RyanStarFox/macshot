@@ -531,7 +531,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
         if let index = HUDAppearance.allCases.firstIndex(of: HUDAppearance.current) {
             hudAppearancePopup.selectItem(at: index)
         }
-        stack.addArrangedSubview(indented(labeledRow(L("HUD:"), controls: [hudAppearancePopup])))
+        stack.addArrangedSubview(labeledRow(L("HUD:"), controls: [hudAppearancePopup]))
         stack.setCustomSpacing(12, after: stack.arrangedSubviews.last!)
 
         // Theme preset dropdown
@@ -542,7 +542,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSWindowD
         themePresetPopup.addItem(withTitle: L("Custom"))
         themePresetPopup.target = self
         themePresetPopup.action = #selector(themePresetChanged(_:))
-        stack.addArrangedSubview(indented(labeledRow(L("Theme:"), controls: [themePresetPopup])))
+        stack.addArrangedSubview(labeledRow(L("Theme:"), controls: [themePresetPopup]))
         stack.setCustomSpacing(12, after: stack.arrangedSubviews.last!)
 
         // Three color wells in a single row with labels underneath
